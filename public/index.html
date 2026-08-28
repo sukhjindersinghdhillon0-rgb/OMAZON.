@@ -4,6 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OMAZON — Luxury Tech & Apparel</title>
+    <!-- Include EmailJS SDK -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+    <script type="text/javascript">
+       (function(){
+          emailjs.init({
+             publicKey: "B0GTqxt9alu4L5ofj",
+          });
+       })();
+    </script>
     <style>
         :root {
             --bg-primary: #0b0f19;
@@ -481,6 +490,7 @@
         let currentUserEmail = null;
         let currentCategory = 'all';
         let activeQuickViewItem = null;
+        let generatedOTP = null; // Stores the generated code for verification
 
         function renderProducts(items) {
             const container = document.getElementById('products-container');
@@ -557,33 +567,37 @@
             setTimeout(() => toast.classList.remove('show'), 3500);
         }
 
-        async function sendOTP() {
+        function sendOTP() {
             const email = document.getElementById('email-input').value.trim();
             if (!email.includes('@')) return showToast('Enter a valid email.', '⚠️');
 
             const btn = document.getElementById('send-btn');
-            btn.disabled = true; btn.innerText = 'Sending...';
+            btn.disabled = true; 
+            btn.innerText = 'Sending...';
 
-            try {
-                const res = await fetch('/api/send-otp', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email })
-                });
-                const data = await res.json();
-                if (data.success) {
+            // Generate a random 6-digit OTP code
+            generatedOTP = Math.floor(100000 + Math.random() * 900000).toString();
+
+            const templateParams = {
+                email: email,
+                otp: generatedOTP
+            };
+
+            // Send via EmailJS using your credentials
+            emailjs.send('service_3qgw526', 'template_ps055sv', templateParams)
+                .then(function(response) {
                     currentUserEmail = email;
                     document.getElementById('step-email').classList.add('hidden');
                     document.getElementById('step-otp').classList.remove('hidden');
                     showToast('OTP sent to your email!', '📧');
-                } else {
-                    showToast(data.message, '❌');
-                }
-            } catch (err) {
-                showToast('Server connection failed.', '❌');
-            } finally {
-                btn.disabled = false; btn.innerText = 'Send Passcode';
-            }
+                }, function(error) {
+                    showToast('Failed to send email. Try again.', '❌');
+                    console.error('EmailJS Error:', error);
+                })
+                .finally(() => {
+                    btn.disabled = false; 
+                    btn.innerText = 'Send Passcode';
+                });
         }
 
         function moveFocus(el, idx) {
@@ -591,38 +605,30 @@
             if (el.value.length === 1 && idx < 5) inputs[idx + 1].focus();
         }
 
-        async function verifyOTP() {
-            let otp = '';
-            document.querySelectorAll('.otp-input').forEach(i => otp += i.value);
-            if (otp.length !== 6) return showToast('Enter full 6-digit code.', '⚠️');
+        function verifyOTP() {
+            let enteredOTP = '';
+            document.querySelectorAll('.otp-input').forEach(i => enteredOTP += i.value);
+            if (enteredOTP.length !== 6) return showToast('Enter full 6-digit code.', '⚠️');
 
-            try {
-                const res = await fetch('/api/verify-otp', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: currentUserEmail, otp })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    document.getElementById('open-auth-btn').classList.add('hidden');
-                    document.getElementById('user-profile').classList.remove('hidden');
-                    document.getElementById('user-email-display').innerText = currentUserEmail;
-                    closeAuthModal();
-                    showToast('Signed in successfully!', '✅');
-                } else {
-                    showToast(data.message, '❌');
-                }
-            } catch (err) {
-                showToast('Verification failed.', '❌');
+            if (enteredOTP === generatedOTP) {
+                document.getElementById('open-auth-btn').classList.add('hidden');
+                document.getElementById('user-profile').classList.remove('hidden');
+                document.getElementById('user-email-display').innerText = currentUserEmail;
+                closeAuthModal();
+                showToast('Signed in successfully!', '✅');
+            } else {
+                showToast('Invalid OTP code. Try again.', '❌');
             }
         }
 
         function logout() {
             currentUserEmail = null;
+            generatedOTP = null;
             document.getElementById('open-auth-btn').classList.remove('hidden');
             document.getElementById('user-profile').classList.add('hidden');
             document.getElementById('step-email').classList.remove('hidden');
             document.getElementById('step-otp').classList.add('hidden');
+            document.querySelectorAll('.otp-input').forEach(i => i.value = '');
             showToast('Logged out.', 'ℹ️');
         }
 
