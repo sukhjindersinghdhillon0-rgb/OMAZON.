@@ -1,6 +1,6 @@
 require('dotenv').config();
 const express = require('express');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const path = require('path');
 
 const app = express();
@@ -13,14 +13,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 // In-memory store for OTPs
 const otpStore = {};
 
-// Configure Nodemailer Transporter
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    }
-});
+// Initialize Resend
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Route 1: Send OTP Email
 app.post('/api/send-otp', async (req, res) => {
@@ -34,26 +28,25 @@ app.post('/api/send-otp', async (req, res) => {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     otpStore[email] = otp;
 
-    const mailOptions = {
-        from: `"Omazon" <${process.env.EMAIL_USER}>`,
-        to: email,
-        subject: 'Your Omazon Verification Code',
-        html: `
-            <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-                <h2>Welcome to Omazon</h2>
-                <p>Your one-time verification code is:</p>
-                <h1 style="color: #0284c7; letter-spacing: 4px;">${otp}</h1>
-                <p>This code will expire shortly. Do not share it with anyone.</p>
-            </div>
-        `
-    };
-
     try {
-        await transporter.sendMail(mailOptions);
+        const data = await resend.emails.send({
+            from: 'Omazon <onboarding@resend.dev>', // Use onboarding@resend.dev for testing without a domain
+            to: [email],
+            subject: 'Your Omazon Verification Code',
+            html: `
+                <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+                    <h2>Welcome to Omazon</h2>
+                    <p>Your one-time verification code is:</p>
+                    <h1 style="color: #0284c7; letter-spacing: 4px;">${otp}</h1>
+                    <p>This code will expire shortly. Do not share it with anyone.</p>
+                </div>
+            `
+        });
+
         res.json({ success: true, message: `Verification code sent to ${email}` });
     } catch (error) {
-        console.error('Nodemailer Error:', error);
-        res.status(500).json({ success: false, message: 'Failed to send email. Check your Google App Password.' });
+        console.error('Resend Error:', error);
+        res.status(500).json({ success: false, message: 'Failed to send email via Resend.' });
     }
 });
 
