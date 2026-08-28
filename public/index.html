@@ -586,16 +586,23 @@
             // Send via EmailJS using your credentials
             emailjs.send('service_3qgw526', 'template_ps055sv', templateParams)
                 .then(function(response) {
+                    console.log('EMAILJS SUCCESS:', response.status, response.text);
+
                     currentUserEmail = email;
                     document.getElementById('step-email').classList.add('hidden');
                     document.getElementById('step-otp').classList.remove('hidden');
                     showToast('OTP sent to your email!', '📧');
-                }, function(error) {
-                    showToast('Email could not be sent. Check Console.', '❌');
-                    console.error('EmailJS Error:', error);
+
+                })
+                .catch(function(error) {
+                    console.error('EMAILJS ERROR:', error);
+                    console.error('Status:', error.status);
+                    console.error('Text:', error.text);
+
+                    showToast('Email failed: ' + (error.text || error.status || 'Unknown error'), '❌');
                 })
                 .finally(() => {
-                    btn.disabled = false; 
+                    btn.disabled = false;
                     btn.innerText = 'Send Passcode';
                 });
         }
